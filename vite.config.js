@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      injectRegister: 'inline', // 🚀 Fuerza a inyectar el registro de instalación directamente
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
@@ -21,7 +22,7 @@ export default defineConfig({
             src: 'img/icono.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable' // 🤖 Fuerza a Android a encuadrar el ícono perfectamente
+            purpose: 'any maskable'
           },
           {
             src: 'img/icono.png',
@@ -30,8 +31,8 @@ export default defineConfig({
             purpose: 'any maskable'
           },
           {
-            src: 'img/icono2.png', // 🍏 Ícono exclusivo para iPhone
-            sizes: '180x180',       // Tamaño estándar que exige Apple para los accesos directos
+            src: 'img/icono2.png',
+            sizes: '180x180',
             type: 'image/png',
             purpose: 'any'
           }
