@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Board from './components/Board';
 import SetupPanel from './components/SetupPanel';
-
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 export default function App() {
+  // Registra el service worker de la PWA
+  useRegisterSW({ immediate: true });
+
   const [playerIcons, setPlayerIcons] = useState({
     X: { type: 'img', value: '/img/keiko.png', color: '#FF6600', label: 'Keiko' },
     O: { type: 'img', value: '/img/roberto.png', color: '#00A859', label: 'Roberto' }
@@ -16,14 +18,59 @@ export default function App() {
   const [turn, setTurn] = useState('X');
   const [active, setActive] = useState(true);
   
+  // Estados de animación final
   const [winningLine, setWinningLine] = useState(null);
   const [glowingCells, setGlowingCells] = useState([]); 
   const [showWinnerPodium, setShowWinnerPodium] = useState(false); 
   const [gameWinner, setGameWinner] = useState(null);
 
+  // 🚨 ESTADOS PARA EL BOTÓN DE INSTALACIÓN PERSONALIZADO
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
   const audioCtxRef = useRef(null);
   const canvasRef = useRef(null);
   const animationFrameRef = useRef(null);
+
+  // Escuchar el evento de instalación del navegador
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      // Evita que el navegador ponga su aviso nativo clásico
+      e.preventDefault();
+      // Guarda el evento para usarlo cuando presionen nuestro botón
+      setDeferredPrompt(e);
+      // Muestra nuestro botón personalizado en la pantalla
+      setShowInstallBtn(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Si la app ya se instaló con éxito, esconde el botón de inmediato
+    window.addEventListener('appinstalled', () => {
+      setDeferredPrompt(null);
+      setShowInstallBtn(false);
+      console.log('¡Michi Político instalado con éxito!');
+    });
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  // Función para activar la instalación manual al dar clic
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    // Muestra la ventana oficial del sistema para confirmar instalación
+    deferredPrompt.prompt();
+    // Espera la respuesta del usuario
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('El usuario aceptó la instalación.');
+    }
+    // Limpiamos el evento y destruimos el botón para siempre
+    setDeferredPrompt(null);
+    setShowInstallBtn(false);
+  };
 
   const initAudio = () => {
     if (!audioCtxRef.current) {
@@ -179,16 +226,13 @@ export default function App() {
       setWinningLine(win);
       setGameWinner(turn);
       
-      // ⏱️ EFECTO SECUENCIAL CADA 0.5 SEGUNDOS (500ms)
       win.forEach((idx, i) => {
         setTimeout(() => {
           setGlowingCells(prev => [...prev, idx]);
-          // Sonido sincronizado más agudo por cada paso
           playSound(523.25 + (i * 150), 0.3, 'triangle', 0.8);
         }, i * 500); 
       });
 
-      // El podio aparece justo después de que se enciende el último recuadro
       setTimeout(() => {
         setShowWinnerPodium(true);
         playWinnerSong(turn); 
@@ -217,6 +261,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 select-none relative overflow-hidden">
       <SetupPanel playerIcons={playerIcons} setPlayerIcons={setPlayerIcons} />
+      
       <div 
         className="text-xl font-bold mb-4 px-6 py-2 bg-white rounded-full shadow-md transition-colors duration-300"
         style={{ color: playerIcons[turn].color }}
@@ -233,9 +278,24 @@ export default function App() {
         removalIndex={active ? (turn === 'X' ? (movesX.length === 3 ? movesX[0] : null) : (movesO.length === 3 ? movesO[0] : null)) : null} 
       />
 
-      <button onClick={resetGame} className="mt-6 px-10 py-3 bg-green-500 text-white font-bold text-lg rounded-full shadow-[0_4px_0_#2e7d32] active:translate-y-1 active:shadow-[0_1px_0_#2e7d32] transition-all z-20">
-        ¡REINICIAR!
-      </button>
+      <div className="flex flex-col gap-3 w-full max-w-[260px] items-center">
+        <button 
+          onClick={resetGame} 
+          className="mt-6 w-full py-3 bg-green-500 text-white font-bold text-lg rounded-full shadow-[0_4px_0_#2e7d32] active:translate-y-1 active:shadow-[0_1px_0_#2e7d32] transition-all z-20"
+        >
+          ¡REINICIAR!
+        </button>
+
+        {/* 🚨 BOTÓN DE INSTALACIÓN DINÁMICO: Solo aparece si el navegador da luz verde, y se elimina al instalar */}
+        {showInstallBtn && (
+          <button 
+            onClick={handleInstallClick}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm rounded-full shadow-[0_4px_0_#1a237e] active:translate-y-0.5 active:shadow-[0_1px_0_#1a237e] transition-all animate-bounce z-20"
+          >
+            📥 INSTALAR APLICACIÓN
+          </button>
+        )}
+      </div>
 
       {showWinnerPodium && gameWinner && (
         <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center z-50 p-6 transition-all duration-300">
