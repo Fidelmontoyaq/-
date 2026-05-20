@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import Board from './components/Board';
 import SetupPanel from './components/SetupPanel';
 
+import { useRegisterSW } from 'virtual:pwa-register/react';
+
 export default function App() {
   const [playerIcons, setPlayerIcons] = useState({
     X: { type: 'img', value: '/img/keiko.png', color: '#FF6600', label: 'Keiko' },
