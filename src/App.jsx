@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Board from './components/Board';
 import SetupPanel from './components/SetupPanel';
-import { useRegisterSW } from 'virtual:pwa-register/react';
+
+// 🚨 REGISTRO DE SERVICE WORKER EXACTAMENTE COMO EN TU APPLICACIÓN COMI
+import { registerSW } from 'virtual:pwa-register';
+
+// Registro automático de actualizaciones
+registerSW({ immediate: true });
 
 export default function App() {
-  // Registra el service worker de la PWA
-  useRegisterSW({ immediate: true });
-
   const [playerIcons, setPlayerIcons] = useState({
     X: { type: 'img', value: '/img/keiko.png', color: '#FF6600', label: 'Keiko' },
     O: { type: 'img', value: '/img/roberto.png', color: '#00A859', label: 'Roberto' }
@@ -24,54 +26,46 @@ export default function App() {
   const [showWinnerPodium, setShowWinnerPodium] = useState(false); 
   const [gameWinner, setGameWinner] = useState(null);
 
-  // 🚨 ESTADOS PARA EL BOTÓN DE INSTALACIÓN PERSONALIZADO
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showInstallBtn, setShowInstallBtn] = useState(false);
+  // 📲 LOGICA DE INSTALACIÓN PWA (Fiel copia exacta de tu app Comi que sí funciona)
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   const audioCtxRef = useRef(null);
   const canvasRef = useRef(null);
   const animationFrameRef = useRef(null);
 
-  // Escuchar el evento de instalación del navegador
   useEffect(() => {
-    const handleBeforeInstallPrompt = (e) => {
-      // Evita que el navegador ponga su aviso nativo clásico
+    // Detectar si ya está abierta como App instalada
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+
+    // Escuchar el evento de instalación del navegador
+    const capturarPrompt = (e) => {
       e.preventDefault();
-      // Guarda el evento para usarlo cuando presionen nuestro botón
-      setDeferredPrompt(e);
-      // Muestra nuestro botón personalizado en la pantalla
-      setShowInstallBtn(true);
+      setInstallPrompt(e);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('beforeinstallprompt', capturarPrompt);
 
-    // Si la app ya se instaló con éxito, esconde el botón de inmediato
     window.addEventListener('appinstalled', () => {
-      setDeferredPrompt(null);
-      setShowInstallBtn(false);
-      console.log('¡Michi Político instalado con éxito!');
+      setIsInstalled(true);
+      setInstallPrompt(null);
     });
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('beforeinstallprompt', capturarPrompt);
     };
   }, []);
 
-  // Función para activar la instalación manual al dar clic
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    // Muestra la ventana oficial del sistema para confirmar instalación
-    deferredPrompt.prompt();
-    // Espera la respuesta del usuario
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      console.log('El usuario aceptó la instalación.');
-    }
-    // Limpiamos el evento y destruimos el botón para siempre
-    setDeferredPrompt(null);
-    setShowInstallBtn(false);
+  const manejarInstalacion = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setInstallPrompt(null);
   };
 
+  // Lógica de Audio y Juego
   const initAudio = () => {
     if (!audioCtxRef.current) {
       audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -260,6 +254,26 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 select-none relative overflow-hidden">
+      
+      {/* BANNER DE INSTALACIÓN EXACTO DE COMI (Adaptado con estilo para tu Michi) */}
+      {!isInstalled && installPrompt && (
+        <div className="mb-4 w-full max-w-[320px] animate-bounce z-30">
+          <button 
+            onClick={manejarInstalacion}
+            className="w-full bg-orange-600 text-white p-3 rounded-2xl shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📲</span>
+              <div className="text-left">
+                <p className="font-bold text-xs">Instalar "Michi Político"</p>
+                <p className="text-[10px] opacity-90">Juega directo en pantalla completa</p>
+              </div>
+            </div>
+            <span className="bg-white text-orange-600 px-3 py-1 rounded-full text-[10px] font-black uppercase">Instalar</span>
+          </button>
+        </div>
+      )}
+
       <SetupPanel playerIcons={playerIcons} setPlayerIcons={setPlayerIcons} />
       
       <div 
@@ -278,24 +292,9 @@ export default function App() {
         removalIndex={active ? (turn === 'X' ? (movesX.length === 3 ? movesX[0] : null) : (movesO.length === 3 ? movesO[0] : null)) : null} 
       />
 
-      <div className="flex flex-col gap-3 w-full max-w-[260px] items-center">
-        <button 
-          onClick={resetGame} 
-          className="mt-6 w-full py-3 bg-green-500 text-white font-bold text-lg rounded-full shadow-[0_4px_0_#2e7d32] active:translate-y-1 active:shadow-[0_1px_0_#2e7d32] transition-all z-20"
-        >
-          ¡REINICIAR!
-        </button>
-
-        {/* 🚨 BOTÓN DE INSTALACIÓN DINÁMICO: Solo aparece si el navegador da luz verde, y se elimina al instalar */}
-        {showInstallBtn && (
-          <button 
-            onClick={handleInstallClick}
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm rounded-full shadow-[0_4px_0_#1a237e] active:translate-y-0.5 active:shadow-[0_1px_0_#1a237e] transition-all animate-bounce z-20"
-          >
-            📥 INSTALAR APLICACIÓN
-          </button>
-        )}
-      </div>
+      <button onClick={resetGame} className="mt-6 px-10 py-3 bg-green-500 text-white font-bold text-lg rounded-full shadow-[0_4px_0_#2e7d32] active:translate-y-1 active:shadow-[0_1px_0_#2e7d32] transition-all z-20">
+        ¡REINICIAR!
+      </button>
 
       {showWinnerPodium && gameWinner && (
         <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center z-50 p-6 transition-all duration-300">
